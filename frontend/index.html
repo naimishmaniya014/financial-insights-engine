@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial News Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .search-section {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            padding: 40px;
+        }
+
+        .news-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        }
+
+        .news-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .news-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .news-summary {
+            color: #6c757d;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+
+        .news-source {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .news-date {
+            font-style: italic;
+        }
+
+        .news-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .news-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .no-results h3 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .query-history {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .query-history h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .query-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .query-info {
+            flex: 1;
+        }
+
+        .query-company {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .query-time {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .query-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+            }
+
+            .search-input {
+                min-width: 100%;
+            }
+
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 Financial News Dashboard</h1>
+            <p>Get the latest financial news for any company</p>
+        </div>
+
+        <div class="search-section">
+            <form class="search-form" id="searchForm">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="companyInput" 
+                    placeholder="Enter company symbol (e.g., AAPL, MSFT, GOOGL)"
+                    required
+                >
+                <button type="submit" class="search-btn" id="searchBtn">
+                    Search News
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Fetching latest news...</p>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <div id="results"></div>
+            <div class="query-history" id="queryHistory" style="display: none;">
+                <h3>Recent Queries</h3>
+                <div id="queryList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        const searchForm = document.getElementById('searchForm');
+        const companyInput = document.getElementById('companyInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const queryHistory = document.getElementById('queryHistory');
+        const queryList = document.getElementById('queryList');
+
+        // Load query history on page load
+        loadQueryHistory();
+
+        searchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const companyName = companyInput.value.trim().toUpperCase();
+            
+            if (!companyName) return;
+
+            // Show loading state
+            loading.style.display = 'block';
+            searchBtn.disabled = true;
+            results.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/news/${companyName}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to fetch news');
+                }
+
+                const data = await response.json();
+                displayNews(data);
+                loadQueryHistory(); // Refresh query history
+
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                loading.style.display = 'none';
+                searchBtn.disabled = false;
+            }
+        });
+
+        function displayNews(data) {
+            const { company_name, news_items, query_id, timestamp } = data;
+            
+            if (news_items.length === 0) {
+                results.innerHTML = `
+                    <div class="no-results">
+                        <h3>No news found</h3>
+                        <p>No recent news found for ${company_name}. Try a different company symbol.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const newsHTML = news_items.map(item => `
+                <div class="news-card">
+                    <h3 class="news-title">${item.title}</h3>
+                    <div class="news-meta">
+                        <span class="news-source">${item.source || 'Unknown Source'}</span>
+                        <span class="news-date">${item.published_date ? new Date(item.published_date).toLocaleDateString() : 'Unknown Date'}</span>
+                    </div>
+                    ${item.summary ? `<p class="news-summary">${item.summary}</p>` : ''}
+                    ${item.url ? `<a href="${item.url}" target="_blank" class="news-link">Read Full Article</a>` : ''}
+                </div>
+            `).join('');
+
+            results.innerHTML = `
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">Latest News for ${company_name}</h2>
+                <div class="news-grid">
+                    ${newsHTML}
+                </div>
+            `;
+        }
+
+        function displayError(message) {
+            results.innerHTML = `
+                <div class="error">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+        }
+
+        async function loadQueryHistory() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/queries`);
+                const data = await response.json();
+                
+                if (data.queries && data.queries.length > 0) {
+                    queryHistory.style.display = 'block';
+                    queryList.innerHTML = data.queries.map(query => `
+                        <div class="query-item">
+                            <div class="query-info">
+                                <div class="query-company">${query[1]}</div>
+                                <div class="query-time">${new Date(query[2]).toLocaleString()}</div>
+                            </div>
+                            <span class="query-status status-${query[3]}">${query[3]}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    queryHistory.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to load query history:', error);
+            }
+        }
+    </script>
+</body>
+</html>
