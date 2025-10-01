@@ -49,25 +49,46 @@ Or create a `.env` file in the project root:
 FINNHUB_API_KEY=your_api_key_here
 ```
 
-### 4. Run the Backend
+### 4. Start Both Servers
+
+**Easy way (recommended):**
 
 ```bash
-cd backend
-python main.py
+./start.sh
 ```
 
-The API will be available at `http://localhost:8000`
+This will start both backend and frontend servers automatically.
 
-### 5. Open the Frontend
-
-Open `frontend/index.html` in your web browser, or serve it using a local server:
+**Manual way:**
 
 ```bash
-# Using Python's built-in server
-cd frontend
-python -m http.server 8001
+# Terminal 1 - Backend
+source venv/bin/activate
+export FINNHUB_API_KEY="your_api_key_here"
+cd backend
+python main.py
 
-# Then open http://localhost:8001 in your browser
+# Terminal 2 - Frontend
+cd frontend
+python3 -m http.server 3000
+```
+
+### 5. Access the Application
+
+- **Frontend UI**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+
+### 6. Stop the Servers
+
+**If using start.sh:**
+
+- Press `Ctrl+C` in the terminal where you ran `./start.sh`
+
+**Manual stop:**
+
+```bash
+./stop.sh
 ```
 
 ## API Endpoints

@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
-import requests
+import finnhub
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 app = FastAPI(title="Financial News API", version="1.0.0")
@@ -46,11 +46,15 @@ def init_database():
         CREATE TABLE IF NOT EXISTS news_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             query_id INTEGER,
-            title TEXT NOT NULL,
+            headline TEXT NOT NULL,
             summary TEXT,
             url TEXT,
             published_date TEXT,
             source TEXT,
+            category TEXT,
+            image_url TEXT,
+            finnhub_id INTEGER,
+            related_ticker TEXT,
             FOREIGN KEY (query_id) REFERENCES queries (id)
         )
     """
@@ -65,11 +69,15 @@ init_database()
 
 
 class NewsItem(BaseModel):
-    title: str
+    headline: str
     summary: Optional[str] = None
     url: Optional[str] = None
     published_date: Optional[str] = None
     source: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    finnhub_id: Optional[int] = None
+    related_ticker: Optional[str] = None
 
 
 class NewsResponse(BaseModel):
@@ -89,51 +97,68 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/news/{company_name}", response_model=NewsResponse)
-async def get_company_news(company_name: str):
+@app.post("/news", response_model=NewsResponse)
+async def get_company_news(
+    ticker: str = Query(..., description="Company ticker symbol (e.g., AAPL, MSFT)"),
+    from_date: str = Query(..., description="Start date in YYYY-MM-DD format"),
+    to_date: str = Query(..., description="End date in YYYY-MM-DD format"),
+    max_articles: int = Query(
+        3, ge=1, le=10, description="Maximum number of articles to return (1-10)"
+    ),
+):
     """
-    Get latest financial news for a specific company
+    Get financial news for a specific company ticker within a date range
     """
     try:
+        # Validate and parse dates
+        try:
+            from_dt = datetime.strptime(from_date, "%Y-%m-%d")
+            to_dt = datetime.strptime(to_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail="Invalid date format. Use YYYY-MM-DD"
+            )
+
+        if from_dt >= to_dt:
+            raise HTTPException(
+                status_code=400, detail="from_date must be before to_date"
+            )
+
         # Store query in database
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO queries (company_name, status) VALUES (?, ?)",
-            (company_name, "processing"),
+            (ticker.upper(), "processing"),
         )
         query_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
-        # Get news from Finnhub API (you'll need to set FINNHUB_API_KEY environment variable)
+        # Get news from Finnhub API
         api_key = os.getenv("FINNHUB_API_KEY")
         if not api_key:
             raise HTTPException(
                 status_code=500, detail="Finnhub API key not configured"
             )
 
-        # Fetch news from Finnhub
-        url = f"https://finnhub.io/api/v1/company-news"
-        params = {
-            "symbol": company_name.upper(),
-            "from": (datetime.now().timestamp() - 7 * 24 * 3600),  # Last 7 days
-            "to": datetime.now().timestamp(),
-            "token": api_key,
-        }
+        # Initialize Finnhub client
+        finnhub_client = finnhub.Client(api_key=api_key)
 
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        news_data = response.json()
+        # Fetch news from Finnhub
+        news_data = finnhub_client.company_news(
+            ticker.upper(), _from=from_date, to=to_date
+        )
 
         # Process and store news items
         news_items = []
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
 
-        for item in news_data[:10]:  # Limit to top 10 news items
+        # Limit to max_articles and process
+        for item in news_data[:max_articles]:
             news_item = NewsItem(
-                title=item.get("headline", ""),
+                headline=item.get("headline", ""),
                 summary=item.get("summary", ""),
                 url=item.get("url", ""),
                 published_date=(
@@ -142,21 +167,30 @@ async def get_company_news(company_name: str):
                     else None
                 ),
                 source=item.get("source", ""),
+                category=item.get("category", ""),
+                image_url=item.get("image", ""),
+                finnhub_id=item.get("id"),
+                related_ticker=item.get("related", ""),
             )
             news_items.append(news_item)
 
             # Store in database
             cursor.execute(
                 """INSERT INTO news_results 
-                   (query_id, title, summary, url, published_date, source) 
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (query_id, headline, summary, url, published_date, source, 
+                    category, image_url, finnhub_id, related_ticker) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     query_id,
-                    news_item.title,
+                    news_item.headline,
                     news_item.summary,
                     news_item.url,
                     news_item.published_date,
                     news_item.source,
+                    news_item.category,
+                    news_item.image_url,
+                    news_item.finnhub_id,
+                    news_item.related_ticker,
                 ),
             )
 
@@ -169,25 +203,26 @@ async def get_company_news(company_name: str):
         conn.close()
 
         return NewsResponse(
-            company_name=company_name,
+            company_name=ticker.upper(),
             news_items=news_items,
             query_id=query_id,
             timestamp=datetime.now().isoformat(),
         )
 
-    except requests.RequestException as e:
+    except Exception as e:
         # Update query status to failed
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE queries SET status = ? WHERE id = ?", ("failed", query_id)
-        )
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(DATABASE_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE queries SET status = ? WHERE id = ?", ("failed", query_id)
+            )
+            conn.commit()
+            conn.close()
+        except:
+            pass  # If we can't update the status, continue with error
 
         raise HTTPException(status_code=500, detail=f"Failed to fetch news: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/queries")
