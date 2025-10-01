@@ -1,5 +1,8 @@
 # env
 .env
 
-# ignore .DS_Store files
+# .DS_Store files
 .DS_Store
+
+# imagine sdk file
+imagine_sdk-0.4.2-py3-none-any.whl
